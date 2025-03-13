@@ -1,0 +1,70 @@
+.chess-board {
+  width: 800px;
+  height: 900px;
+  border: 2px solid #333;
+  margin: 20px auto;
+  background-color: #f0c4a8;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-row {
+  display: flex;
+  flex: 1;
+}
+
+.board-cell {
+  flex: 1;
+  border: 1px solid #666;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.board-cell:hover {
+  background-color: rgba(255, 255, 0, 0.2);
+}
+
+.piece {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+  user-select: none;
+}
+
+.piece.red {
+  background-color: #f44336;
+  color: #fff;
+  border: 2px solid #d32f2f;
+}
+
+.piece.black {
+  background-color: #000;
+  color: #fff;
+  border: 2px solid #333;
+}
+
+.selected {
+  background-color: rgba(255, 255, 0, 0.3);
+}
+
+.game-over {
+  font-size: 24px;
+  color: #d32f2f;
+  text-align: center;
+  margin-top: 20px;
+  font-weight: bold;
+}
+
+.current-player {
+  font-size: 20px;
+  text-align: center;
+  margin-top: 10px;
+} 
