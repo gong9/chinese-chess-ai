@@ -232,7 +232,13 @@ const ChineseChess = () => {
         }
         
         // 记录最后移动的棋子
+        console.log(`设置最后移动的棋子位置: (${row}, ${col})`);
         setLastMove({ row, col });
+        
+        // 记录历史
+        const newHistory = [...gameHistory.slice(0, historyIndex + 1), newBoard];
+        setGameHistory(newHistory);
+        setHistoryIndex(historyIndex + 1);
         
         setBoard(newBoard);
         setCurrentPlayer(currentPlayer === 'red' ? 'black' : 'red');
@@ -473,20 +479,18 @@ const ChineseChess = () => {
 
   const renderBoard = () => {
     return (
-      <div className="chess-board">
-        <div className="board-grid" onClick={handleBoardClick}>
+      <div className="chess-board" onClick={handleBoardClick}>
+        <div className="board-grid">
           {/* 渲染横线 */}
           {[...Array(10)].map((_, i) => (
             <div
               key={`h-${i}`}
-              className={`horizontal-line ${
-                i === 0 ? 'upper' : 
-                i === 9 ? 'lower' : 
-                (i === 4 || i === 5) ? 'river' : 'middle'
-              }`}
+              className={`horizontal-line middle ${i === 4 || i === 5 ? 'river' : ''}`}
               style={{ top: `${i * (760/9)}px` }}
             />
           ))}
+          <div className="horizontal-line upper" />
+          <div className="horizontal-line lower" />
           
           {/* 渲染竖线 */}
           {[...Array(9)].map((_, i) => (
@@ -497,19 +501,19 @@ const ChineseChess = () => {
             />
           ))}
 
-          {/* 添加九宫格斜线 */}
+          {/* 九宫格 */}
           <div className="palace-cross top"></div>
           <div className="palace-cross bottom"></div>
 
           {/* 河界区域 - 放在竖线之后，确保覆盖竖线 */}
           <div className="river-area" />
-
-          {/* 楚河汉界 */}
           <div className="river-text">
-            <div>楚河</div>
-            <div>汉界</div>
+            <span>楚</span>
+            <span>河</span>
+            <span>汉</span>
+            <span>界</span>
           </div>
-
+          
           {/* 渲染棋子 */}
           {board.map((row, rowIndex) => 
             row.map((piece, colIndex) => 
@@ -543,16 +547,144 @@ const ChineseChess = () => {
   };
 
   const restartGame = () => {
-    setBoard(initializeBoard());
+    const initialBoard = initializeBoard();
+    setBoard(initialBoard);
     setSelectedPiece(null);
     setCurrentPlayer('red');
     setGameOver(false);
     setLastMove(null);
-    setGameHistory([initializeBoard()]);
+    setGameHistory([initialBoard]);
     setHistoryIndex(0);
   };
 
-  // 改进AI移动函数
+  // 优化AI评估函数，简化计算
+  const evaluateBoard = (board) => {
+    let score = 0;
+    
+    // 简单计算棋子价值
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col];
+        if (piece) {
+          // 基本棋子价值
+          let pieceValue = PIECE_VALUES[piece.type];
+          
+          // 简单的位置加成
+          // 兵/卒过河加分
+          if ((piece.type === '兵' && row < 5) || (piece.type === '卒' && row > 4)) {
+            pieceValue += 3;
+          }
+          
+          // 马在中心位置加分
+          if (piece.type === '马' && col > 1 && col < 7 && row > 1 && row < 8) {
+            pieceValue += 2;
+          }
+          
+          // 车在开阔位置加分
+          if (piece.type === '车') {
+            const openRows = countOpenSquares(board, row, col, true);
+            const openCols = countOpenSquares(board, row, col, false);
+            pieceValue += (openRows + openCols) * 0.2;
+          }
+          
+          // 将分数添加到总分
+          score += piece.color === 'black' ? pieceValue : -pieceValue;
+        }
+      }
+    }
+    
+    return score;
+  };
+
+  // 计算开阔的行或列上的空格数
+  const countOpenSquares = (board, row, col, isRow) => {
+    let count = 0;
+    
+    if (isRow) {
+      for (let c = 0; c < 9; c++) {
+        if (!board[row][c]) count++;
+      }
+    } else {
+      for (let r = 0; r < 10; r++) {
+        if (!board[r][col]) count++;
+      }
+    }
+    
+    return count;
+  };
+
+  // 优化minimax算法，减少搜索深度和复杂度
+  const minimax = (board, depth, alpha, beta, isMaximizing) => {
+    // 达到搜索深度或游戏结束
+    if (depth === 0) {
+      return evaluateBoard(board);
+    }
+    
+    // 生成所有可能的移动
+    const moves = generateMoves(board, isMaximizing ? 'black' : 'red');
+    
+    if (moves.length === 0) {
+      return 0; // 简化处理，认为是和棋
+    }
+    
+    // 限制考虑的移动数量，提高性能
+    const limitedMoves = moves.slice(0, 10); // 只考虑前10个最有价值的移动
+    
+    if (isMaximizing) {
+      let maxEval = -Infinity;
+      
+      for (const move of limitedMoves) {
+        const evalScore = minimax(move.board, depth - 1, alpha, beta, false);
+        maxEval = Math.max(maxEval, evalScore);
+        alpha = Math.max(alpha, evalScore);
+        if (beta <= alpha) break; // Alpha-Beta剪枝
+      }
+      
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      
+      for (const move of limitedMoves) {
+        const evalScore = minimax(move.board, depth - 1, alpha, beta, true);
+        minEval = Math.min(minEval, evalScore);
+        beta = Math.min(beta, evalScore);
+        if (beta <= alpha) break; // Alpha-Beta剪枝
+      }
+      
+      return minEval;
+    }
+  };
+
+  // 优化findBestMove函数，减少搜索深度
+  const findBestMove = (board, depth = 2) => { // 降低默认搜索深度为2
+    const moves = generateMoves(board, 'black');
+    
+    if (moves.length === 0) return null;
+    
+    // 限制考虑的移动数量
+    const limitedMoves = moves.slice(0, 15); // 只考虑前15个最有价值的移动
+    
+    let bestMove = null;
+    let bestValue = -Infinity;
+    
+    for (const move of limitedMoves) {
+      const value = minimax(move.board, depth - 1, -Infinity, Infinity, false);
+      
+      if (value > bestValue) {
+        bestValue = value;
+        bestMove = {
+          fromRow: move.fromRow,
+          fromCol: move.fromCol,
+          toRow: move.toRow,
+          toCol: move.toCol
+        };
+      }
+    }
+    
+    return bestMove;
+  };
+
+  // 修改makeAIMove函数，减少搜索深度
   const makeAIMove = () => {
     if (gameOver || currentPlayer === 'red' || !playWithAI) return;
     
@@ -562,7 +694,7 @@ const ChineseChess = () => {
     setTimeout(() => {
       try {
         // 降低搜索深度以提高性能
-        const bestMove = findBestMove(board, 2); // 搜索深度为2
+        const bestMove = findBestMove(board, 2); // 搜索深度降为2
         
         if (bestMove) {
           const { fromRow, fromCol, toRow, toCol } = bestMove;
@@ -580,7 +712,13 @@ const ChineseChess = () => {
           }
           
           // 记录最后移动的棋子
+          console.log(`AI设置最后移动的棋子位置: (${toRow}, ${toCol})`);
           setLastMove({ row: toRow, col: toCol });
+          
+          // 记录历史
+          const newHistory = [...gameHistory.slice(0, historyIndex + 1), newBoard];
+          setGameHistory(newHistory);
+          setHistoryIndex(historyIndex + 1);
           
           setBoard(newBoard);
           setCurrentPlayer('red');
@@ -595,231 +733,7 @@ const ChineseChess = () => {
       }
       
       setAiThinking(false);
-    }, 500);
-  };
-
-  // 寻找最佳移动
-  const findBestMove = (board, depth) => {
-    let bestScore = -Infinity;
-    let bestMove = null;
-    
-    // 收集所有黑方棋子的位置
-    const blackPieces = [];
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        if (board[row][col] && board[row][col].color === 'black') {
-          blackPieces.push({ row, col, piece: board[row][col] });
-        }
-      }
-    }
-    
-    // 评估每个可能的移动
-    for (const { row: fromRow, col: fromCol } of blackPieces) {
-      for (let toRow = 0; toRow < 10; toRow++) {
-        for (let toCol = 0; toCol < 9; toCol++) {
-          if (isValidMove(fromRow, fromCol, toRow, toCol)) {
-            // 模拟移动
-            const newBoard = [...board.map(r => [...r])];
-            const capturedPiece = newBoard[toRow][toCol];
-            newBoard[toRow][toCol] = newBoard[fromRow][fromCol];
-            newBoard[fromRow][fromCol] = null;
-            
-            // 检查移动后是否导致将帅相对
-            if (isKingFaceToFace(newBoard)) {
-              continue; // 跳过非法移动
-            }
-            
-            // 评估移动
-            const score = minimax(newBoard, depth - 1, -Infinity, Infinity, false);
-            
-            if (score > bestScore) {
-              bestScore = score;
-              bestMove = { fromRow, fromCol, toRow, toCol };
-            }
-          }
-        }
-      }
-    }
-    
-    return bestMove;
-  };
-
-  // Minimax算法带Alpha-Beta剪枝
-  const minimax = (board, depth, alpha, beta, isMaximizing) => {
-    try {
-      // 到达叶子节点或游戏结束
-      if (depth === 0) {
-        return evaluateBoard(board);
-      }
-      
-      if (isMaximizing) { // 黑方（AI）回合，最大化分数
-        let maxScore = -Infinity;
-        
-        // 收集所有黑方棋子
-        for (let row = 0; row < 10; row++) {
-          for (let col = 0; col < 9; col++) {
-            if (board[row][col] && board[row][col].color === 'black') {
-              // 尝试所有可能的移动
-              for (let toRow = 0; toRow < 10; toRow++) {
-                for (let toCol = 0; toCol < 9; toCol++) {
-                  try {
-                    if (isValidMove(row, col, toRow, toCol, board)) {
-                      // 模拟移动
-                      const newBoard = [...board.map(r => [...r])];
-                      newBoard[toRow][toCol] = newBoard[row][col];
-                      newBoard[row][col] = null;
-                      
-                      // 检查移动后是否导致将帅相对
-                      if (isKingFaceToFace(newBoard)) {
-                        continue;
-                      }
-                      
-                      const score = minimax(newBoard, depth - 1, alpha, beta, false);
-                      maxScore = Math.max(maxScore, score);
-                      alpha = Math.max(alpha, score);
-                      
-                      // Alpha-Beta剪枝
-                      if (beta <= alpha) {
-                        break;
-                      }
-                    }
-                  } catch (error) {
-                    console.error("Error in minimax (max):", error);
-                    // 出错时继续检查其他移动
-                  }
-                }
-              }
-            }
-          }
-        }
-        
-        return maxScore === -Infinity ? evaluateBoard(board) : maxScore;
-      } else { // 红方回合，最小化分数
-        let minScore = Infinity;
-        
-        // 收集所有红方棋子
-        for (let row = 0; row < 10; row++) {
-          for (let col = 0; col < 9; col++) {
-            if (board[row][col] && board[row][col].color === 'red') {
-              // 尝试所有可能的移动
-              for (let toRow = 0; toRow < 10; toRow++) {
-                for (let toCol = 0; toCol < 9; toCol++) {
-                  try {
-                    if (isValidMove(row, col, toRow, toCol, board)) {
-                      // 模拟移动
-                      const newBoard = [...board.map(r => [...r])];
-                      newBoard[toRow][toCol] = newBoard[row][col];
-                      newBoard[row][col] = null;
-                      
-                      // 检查移动后是否导致将帅相对
-                      if (isKingFaceToFace(newBoard)) {
-                        continue;
-                      }
-                      
-                      const score = minimax(newBoard, depth - 1, alpha, beta, true);
-                      minScore = Math.min(minScore, score);
-                      beta = Math.min(beta, score);
-                      
-                      // Alpha-Beta剪枝
-                      if (beta <= alpha) {
-                        break;
-                      }
-                    }
-                  } catch (error) {
-                    console.error("Error in minimax (min):", error);
-                    // 出错时继续检查其他移动
-                  }
-                }
-              }
-            }
-          }
-        }
-        
-        return minScore === Infinity ? evaluateBoard(board) : minScore;
-      }
-    } catch (error) {
-      console.error("Error in minimax:", error);
-      return evaluateBoard(board);
-    }
-  };
-
-  // 评估棋盘状态
-  const evaluateBoard = (board) => {
-    let score = 0;
-    
-    // 计算每个棋子的价值
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        const piece = board[row][col];
-        if (piece) {
-          // 基础棋子价值
-          let pieceValue = PIECE_VALUES[piece.type] || 0;
-          
-          // 位置加成
-          if (POSITION_BONUS[piece.type]) {
-            pieceValue += POSITION_BONUS[piece.type][row][col] || 0;
-          }
-          
-          // 黑方加分，红方减分
-          score += piece.color === 'black' ? pieceValue : -pieceValue;
-        }
-      }
-    }
-    
-    // 检查将军状态
-    if (isCheck(board, 'red')) {
-      score += 50; // 黑方将军加分
-    }
-    if (isCheck(board, 'black')) {
-      score -= 50; // 红方将军减分
-    }
-    
-    return score;
-  };
-
-  // 检查是否将军
-  const isCheck = (board, color) => {
-    // 找到对方的将/帅
-    let kingRow = -1;
-    let kingCol = -1;
-    const kingType = color === 'red' ? '帅' : '将';
-    
-    // 寻找将/帅位置
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        if (board[row][col] && board[row][col].type === kingType && board[row][col].color === color) {
-          kingRow = row;
-          kingCol = col;
-          break;
-        }
-      }
-      if (kingRow !== -1) break;
-    }
-    
-    // 如果找不到将/帅，返回false
-    if (kingRow === -1 || kingCol === -1) {
-      return false;
-    }
-    
-    // 检查对方的每个棋子是否可以吃掉将/帅
-    const opponentColor = color === 'red' ? 'black' : 'red';
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        const piece = board[row][col];
-        if (piece && piece.color === opponentColor) {
-          try {
-            if (isValidMove(row, col, kingRow, kingCol, board)) {
-              return true;
-            }
-          } catch (error) {
-            console.error("Error in isCheck:", error);
-            // 出错时继续检查其他棋子
-          }
-        }
-      }
-    }
-    
-    return false;
+    }, 100); // 减少延迟时间
   };
 
   // 使用useEffect监听玩家回合变化，触发AI移动
@@ -898,6 +812,7 @@ const ChineseChess = () => {
         }
         
         // 记录最后移动的棋子
+        console.log(`AI设置最后移动的棋子位置: (${toRow}, ${toCol})`);
         setLastMove({ row: toRow, col: toCol });
         
         setBoard(newBoard);
@@ -905,6 +820,195 @@ const ChineseChess = () => {
         validMoveFound = true;
       }
     }
+  };
+
+  // 改进悔棋功能中更新最后移动棋子的部分
+  const undoMove = () => {
+    // 如果没有历史记录或只有初始状态，无法悔棋
+    if (historyIndex <= 0) {
+      return;
+    }
+    
+    // 如果游戏已结束，重新设置为未结束
+    if (gameOver) {
+      setGameOver(false);
+    }
+    
+    // 确定要回退的步数
+    // 如果是AI模式且当前是红方回合(即刚刚是AI走的)，回退两步
+    const stepsToUndo = playWithAI && currentPlayer === 'red' ? 2 : 1;
+    
+    // 确保不会回退到负数索引
+    const newIndex = Math.max(0, historyIndex - stepsToUndo);
+    
+    setHistoryIndex(newIndex);
+    setBoard(gameHistory[newIndex]);
+    
+    // 设置当前玩家
+    // 如果回退到初始状态或偶数步，应该是红方回合
+    setCurrentPlayer(newIndex % 2 === 0 ? 'red' : 'black');
+    
+    // 清除选中状态
+    setSelectedPiece(null);
+    
+    // 更新最后移动的棋子
+    if (newIndex > 0) {
+      // 找出最后一步移动的棋子位置
+      const currentBoard = gameHistory[newIndex];
+      const previousBoard = gameHistory[newIndex - 1];
+      
+      // 创建一个函数来比较两个棋子是否相同
+      const isSamePiece = (piece1, piece2) => {
+        if (!piece1 && !piece2) return true;
+        if (!piece1 || !piece2) return false;
+        return piece1.type === piece2.type && piece1.color === piece2.color;
+      };
+      
+      // 寻找两个棋盘之间的差异来确定最后移动的棋子
+      let lastMoveRow = -1;
+      let lastMoveCol = -1;
+      
+      // 首先找出哪里有新增的棋子（目标位置）
+      for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+          if (!isSamePiece(currentBoard[row][col], previousBoard[row][col])) {
+            // 如果当前位置有棋子，而之前位置没有相同的棋子，这可能是移动的目标位置
+            if (currentBoard[row][col]) {
+              lastMoveRow = row;
+              lastMoveCol = col;
+            }
+          }
+        }
+      }
+      
+      // 如果找到了可能的移动位置
+      if (lastMoveRow !== -1 && lastMoveCol !== -1) {
+        console.log(`找到最后移动的棋子位置: (${lastMoveRow}, ${lastMoveCol})`);
+        setLastMove({ row: lastMoveRow, col: lastMoveCol });
+      } else {
+        console.log('未找到最后移动的棋子位置');
+        setLastMove(null);
+      }
+    } else {
+      // 如果回到初始状态，清除最后移动的棋子
+      setLastMove(null);
+    }
+  };
+
+  // 在renderBoard函数中添加调试代码
+  useEffect(() => {
+    console.log("当前lastMove:", lastMove);
+  }, [lastMove]);
+
+  // 添加检查将军状态的函数
+  const isCheck = (board, color) => {
+    // 找到将/帅的位置
+    let kingRow = -1;
+    let kingCol = -1;
+    const kingType = color === 'red' ? '帅' : '将';
+    
+    // 寻找将/帅
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (board[row][col] && board[row][col].type === kingType && board[row][col].color === color) {
+          kingRow = row;
+          kingCol = col;
+          break;
+        }
+      }
+      if (kingRow !== -1) break;
+    }
+    
+    if (kingRow === -1) return false; // 没有找到将/帅
+    
+    // 检查对方的每个棋子是否可以吃掉将/帅
+    const opponentColor = color === 'red' ? 'black' : 'red';
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col];
+        if (piece && piece.color === opponentColor) {
+          if (isValidMove(row, col, kingRow, kingCol, board)) {
+            return true; // 将军
+          }
+        }
+      }
+    }
+    
+    return false; // 没有将军
+  };
+
+  // 添加生成所有可能移动的函数
+  const generateMoves = (board, color) => {
+    const moves = [];
+    
+    for (let fromRow = 0; fromRow < 10; fromRow++) {
+      for (let fromCol = 0; fromCol < 9; fromCol++) {
+        const piece = board[fromRow][fromCol];
+        if (piece && piece.color === color) {
+          for (let toRow = 0; toRow < 10; toRow++) {
+            for (let toCol = 0; toCol < 9; toCol++) {
+              if (isValidMove(fromRow, fromCol, toRow, toCol, board)) {
+                // 检查移动后是否会导致将帅相对
+                const newBoard = [...board.map(r => [...r])];
+                newBoard[toRow][toCol] = board[fromRow][fromCol];
+                newBoard[fromRow][fromCol] = null;
+                
+                if (!isKingFaceToFace(newBoard)) {
+                  // 计算移动的优先级（用于移动排序）
+                  let priority = 0;
+                  
+                  // 捕获对方棋子的移动优先级高
+                  if (board[toRow][toCol]) {
+                    priority += PIECE_VALUES[board[toRow][toCol].type];
+                  }
+                  
+                  // 被威胁的棋子移动优先级高
+                  if (isPieceUnderThreat(board, fromRow, fromCol)) {
+                    priority += PIECE_VALUES[board[fromRow][fromCol].type] / 2;
+                  }
+                  
+                  moves.push({
+                    fromRow,
+                    fromCol,
+                    toRow,
+                    toCol,
+                    priority,
+                    board: newBoard
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 按优先级排序移动
+    moves.sort((a, b) => b.priority - a.priority);
+    
+    return moves;
+  };
+
+  // 检查棋子是否受到威胁
+  const isPieceUnderThreat = (board, row, col) => {
+    const piece = board[row][col];
+    if (!piece) return false;
+    
+    const opponentColor = piece.color === 'red' ? 'black' : 'red';
+    
+    for (let fromRow = 0; fromRow < 10; fromRow++) {
+      for (let fromCol = 0; fromCol < 9; fromCol++) {
+        const attackerPiece = board[fromRow][fromCol];
+        if (attackerPiece && attackerPiece.color === opponentColor) {
+          if (isValidMove(fromRow, fromCol, row, col, board)) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
   };
 
   return (
@@ -924,6 +1028,13 @@ const ChineseChess = () => {
         <div className="game-controls">
           <button className="restart-button" onClick={restartGame}>
             重新开始
+          </button>
+          <button 
+            className="undo-button" 
+            onClick={undoMove}
+            disabled={historyIndex <= 0 || (currentPlayer === 'black' && playWithAI)}
+          >
+            悔棋
           </button>
           <button 
             className={`ai-button ${playWithAI ? 'active' : ''}`} 

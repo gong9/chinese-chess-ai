@@ -382,4 +382,36 @@ body, html {
     transform: translate(-50%, -50%) scale(1);
     box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
   }
+}
+
+/* 悔棋按钮样式 */
+.undo-button {
+  padding: 12px 24px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  background: #7d5a50;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  height: 50px;
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.undo-button:hover:not(:disabled) {
+  background: #9a7b70;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.undo-button:disabled {
+  background: #cccccc;
+  color: #999999;
+  cursor: not-allowed;
+  box-shadow: none;
 } 
