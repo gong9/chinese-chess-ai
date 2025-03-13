@@ -77,7 +77,7 @@ body, html {
   background: #000;
 }
 
-/* 修改河界区域样式，确保完全覆盖网格线 */
+/* 修改河界区域样式，确保不遮挡棋子 */
 .river-area {
   position: absolute;
   top: 50%;
@@ -88,7 +88,7 @@ body, html {
   background: #e8c38d; /* 使用不透明的背景色，与棋盘颜色相同 */
   border-top: 2px solid #000;
   border-bottom: 2px solid #000;
-  z-index: 5; /* 确保河界区域在网格线之上 */
+  z-index: 1; /* 降低z-index，确保不遮挡棋子 */
 }
 
 /* 修改楚河汉界文字样式 */
@@ -105,7 +105,8 @@ body, html {
   width: 400px;
   letter-spacing: 4px;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 6; /* 确保文字在最上层 */
+  z-index: 2; /* 确保文字在河界区域之上，但在棋子之下 */
+  pointer-events: none; /* 确保文字不会阻止点击 */
 }
 
 .river-text span {
@@ -238,12 +239,13 @@ body, html {
 .palace-cross::after {
   content: '';
   position: absolute;
-  background: #000;
+  background: rgba(0, 0, 0, 0.5); /* 降低不透明度 */
   width: 240px;
-  height: 2px;
+  height: 1px; /* 减小线条宽度 */
   top: 50%;
   left: 50%;
   transform-origin: center;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2); /* 添加轻微阴影 */
 }
 
 .palace-cross::before {
@@ -356,4 +358,28 @@ body, html {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* 最后移动的棋子样式 */
+.piece.last-move {
+  background: radial-gradient(circle at 30% 30%, #fff7d6, #ffcc00);
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
+  border: 2px solid #ffcc00;
+  z-index: 2;
+  animation: pulse-last-move 2s infinite;
+}
+
+@keyframes pulse-last-move {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    box-shadow: 0 0 20px rgba(255, 204, 0, 0.9);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
+  }
 } 
