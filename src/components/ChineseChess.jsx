@@ -557,11 +557,26 @@ const ChineseChess = () => {
     setHistoryIndex(0);
   };
 
-  // 优化AI评估函数，简化计算
+  // 增强AI评估函数，使其更全面
   const evaluateBoard = (board) => {
     let score = 0;
     
-    // 简单计算棋子价值
+    // 基本棋子价值
+    const PIECE_VALUES = {
+      '兵': 10,
+      '卒': 10,
+      '炮': 45,
+      '车': 90,
+      '马': 40,
+      '相': 20,
+      '象': 20,
+      '仕': 20,
+      '士': 20,
+      '帅': 10000,
+      '将': 10000
+    };
+    
+    // 计算棋子价值和位置价值
     for (let row = 0; row < 10; row++) {
       for (let col = 0; col < 9; col++) {
         const piece = board[row][col];
@@ -569,22 +584,62 @@ const ChineseChess = () => {
           // 基本棋子价值
           let pieceValue = PIECE_VALUES[piece.type];
           
-          // 简单的位置加成
-          // 兵/卒过河加分
-          if ((piece.type === '兵' && row < 5) || (piece.type === '卒' && row > 4)) {
-            pieceValue += 3;
+          // 位置价值
+          if (POSITION_BONUS[piece.type]) {
+            // 黑方棋子需要翻转位置评估
+            const posRow = piece.color === 'red' ? row : 9 - row;
+            const posCol = piece.color === 'red' ? col : 8 - col;
+            
+            if (POSITION_BONUS[piece.type][posRow] && 
+                POSITION_BONUS[piece.type][posRow][posCol] !== undefined) {
+              pieceValue += POSITION_BONUS[piece.type][posRow][posCol];
+            }
           }
           
-          // 马在中心位置加分
-          if (piece.type === '马' && col > 1 && col < 7 && row > 1 && row < 8) {
-            pieceValue += 2;
-          }
-          
-          // 车在开阔位置加分
+          // 特殊棋子的额外评估
           if (piece.type === '车') {
+            // 车在开阔的行或列上更有价值
             const openRows = countOpenSquares(board, row, col, true);
             const openCols = countOpenSquares(board, row, col, false);
-            pieceValue += (openRows + openCols) * 0.2;
+            pieceValue += (openRows + openCols) * 0.5;
+            
+            // 车控制中路加分
+            if (col >= 3 && col <= 5) {
+              pieceValue += 5;
+            }
+          } else if (piece.type === '马') {
+            // 马在中心位置加分
+            if (row >= 3 && row <= 6 && col >= 2 && col <= 6) {
+              pieceValue += 5;
+            }
+            
+            // 马的机动性加分
+            const mobilityScore = countValidMoves(board, row, col);
+            pieceValue += mobilityScore * 0.5;
+          } else if (piece.type === '炮') {
+            // 炮的攻击目标数量加分
+            const attackTargets = countAttackTargets(board, row, col, piece.color);
+            pieceValue += attackTargets * 3;
+          } else if (piece.type === '兵' || piece.type === '卒') {
+            // 兵/卒过河加分
+            const isAdvanced = (piece.type === '兵' && row > 4) || (piece.type === '卒' && row < 5);
+            if (isAdvanced) {
+              pieceValue += 5;
+              
+              // 越靠近对方将/帅加分越多
+              const distToKing = piece.type === '兵' ? 
+                (9 - row) : row;
+              pieceValue += (5 - distToKing) * 2;
+              
+              // 兵/卒在中路加分
+              if (col >= 3 && col <= 5) {
+                pieceValue += 3;
+              }
+            }
+          } else if (piece.type === '帅' || piece.type === '将') {
+            // 将/帅的安全性评估
+            const kingProtection = countProtectingPieces(board, row, col, piece.color);
+            pieceValue += kingProtection * 5;
           }
           
           // 将分数添加到总分
@@ -592,6 +647,26 @@ const ChineseChess = () => {
         }
       }
     }
+    
+    // 战术评估
+    
+    // 检查将军状态
+    if (isCheck(board, 'red')) {
+      score += 50; // 黑方将军加分
+    }
+    if (isCheck(board, 'black')) {
+      score -= 50; // 红方将军减分
+    }
+    
+    // 控制力评估
+    const blackControlScore = evaluateControlScore(board, 'black');
+    const redControlScore = evaluateControlScore(board, 'red');
+    score += (blackControlScore - redControlScore) * 0.3;
+    
+    // 机动性评估
+    const blackMobility = countTotalMobility(board, 'black');
+    const redMobility = countTotalMobility(board, 'red');
+    score += (blackMobility - redMobility) * 0.2;
     
     return score;
   };
@@ -613,379 +688,8 @@ const ChineseChess = () => {
     return count;
   };
 
-  // 优化minimax算法，减少搜索深度和复杂度
-  const minimax = (board, depth, alpha, beta, isMaximizing) => {
-    // 达到搜索深度或游戏结束
-    if (depth === 0) {
-      return evaluateBoard(board);
-    }
-    
-    // 生成所有可能的移动
-    const moves = generateMoves(board, isMaximizing ? 'black' : 'red');
-    
-    if (moves.length === 0) {
-      return 0; // 简化处理，认为是和棋
-    }
-    
-    // 限制考虑的移动数量，提高性能
-    const limitedMoves = moves.slice(0, 10); // 只考虑前10个最有价值的移动
-    
-    if (isMaximizing) {
-      let maxEval = -Infinity;
-      
-      for (const move of limitedMoves) {
-        const evalScore = minimax(move.board, depth - 1, alpha, beta, false);
-        maxEval = Math.max(maxEval, evalScore);
-        alpha = Math.max(alpha, evalScore);
-        if (beta <= alpha) break; // Alpha-Beta剪枝
-      }
-      
-      return maxEval;
-    } else {
-      let minEval = Infinity;
-      
-      for (const move of limitedMoves) {
-        const evalScore = minimax(move.board, depth - 1, alpha, beta, true);
-        minEval = Math.min(minEval, evalScore);
-        beta = Math.min(beta, evalScore);
-        if (beta <= alpha) break; // Alpha-Beta剪枝
-      }
-      
-      return minEval;
-    }
-  };
-
-  // 将重复声明的findBestMove函数重命名为findBestMoveAdvanced
-  // 简化版minimax算法
-  const findBestMoveAdvanced = (board, depth) => {
-    const moves = generateAllMoves(board, 'black');
-    
-    if (moves.length === 0) return null;
-    
-    let bestMove = null;
-    let bestScore = -Infinity;
-    
-    for (const move of moves) {
-      const { fromRow, fromCol, toRow, toCol } = move;
-      const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
-      
-      // 评估移动
-      const score = evaluateMove(board, newBoard, fromRow, fromCol, toRow, toCol);
-      
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = move;
-      }
-    }
-    
-    return bestMove;
-  };
-
-  // 智能选择移动函数
-  const findSmartMove = (board) => {
-    // 1. 检查是否可以将军或吃子
-    const attackMove = findAttackMove(board);
-    if (attackMove) return attackMove;
-    
-    // 2. 检查是否需要防守
-    const defendMove = findDefendMove(board);
-    if (defendMove) return defendMove;
-    
-    // 3. 使用简化版minimax算法
-    return findBestMoveAdvanced(board, 2);
-  };
-
-  // 寻找进攻性移动
-  const findAttackMove = (board) => {
-    // 生成所有可能的移动
-    const allMoves = generateAllMoves(board, 'black');
-    
-    // 首先检查是否可以将军
-    for (const move of allMoves) {
-      const { fromRow, fromCol, toRow, toCol } = move;
-      const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
-      
-      // 检查移动后是否将军
-      if (isCheck(newBoard, 'red')) {
-        return move;
-      }
-    }
-    
-    // 然后检查是否可以吃子，按价值排序
-    const captureMoves = allMoves.filter(move => 
-      board[move.toRow][move.toCol] && board[move.toRow][move.toCol].color === 'red'
-    );
-    
-    if (captureMoves.length > 0) {
-      // 按被吃子的价值排序
-      captureMoves.sort((a, b) => {
-        const aValue = PIECE_VALUES[board[a.toRow][a.toCol].type];
-        const bValue = PIECE_VALUES[board[b.toRow][b.toCol].type];
-        return bValue - aValue;
-      });
-      
-      // 检查是否可以安全吃子（吃完后不会被对方立即吃掉）
-      for (const move of captureMoves) {
-        if (isSafeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol)) {
-          return move;
-        }
-      }
-      
-      // 如果没有安全的吃子，但有高价值的吃子（如吃车、马、炮），也可以考虑
-      if (captureMoves[0] && PIECE_VALUES[board[captureMoves[0].toRow][captureMoves[0].toCol].type] >= 40) {
-        return captureMoves[0];
-      }
-    }
-    
-    return null;
-  };
-
-  // 寻找防守性移动
-  const findDefendMove = (board) => {
-    // 检查将/帅是否被将军
-    if (isCheck(board, 'black')) {
-      // 生成所有可能的移动
-      const allMoves = generateAllMoves(board, 'black');
-      
-      // 找出能解除将军的移动
-      for (const move of allMoves) {
-        const { fromRow, fromCol, toRow, toCol } = move;
-        const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
-        
-        if (!isCheck(newBoard, 'black')) {
-          return move;
-        }
-      }
-    }
-    
-    // 检查是否有高价值棋子被威胁
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        const piece = board[row][col];
-        if (piece && piece.color === 'black' && PIECE_VALUES[piece.type] >= 40) {
-          if (isPieceUnderThreat(board, row, col)) {
-            // 尝试移动该棋子到安全位置
-            const safeMoves = findSafeMovesForPiece(board, row, col);
-            if (safeMoves.length > 0) {
-              return safeMoves[0];
-            }
-            
-            // 如果无法移动该棋子到安全位置，尝试吃掉威胁该棋子的对方棋子
-            const attacker = findAttacker(board, row, col);
-            if (attacker) {
-              const { row: attackerRow, col: attackerCol } = attacker;
-              const defenders = findDefenders(board, attackerRow, attackerCol, 'black');
-              if (defenders.length > 0) {
-                return defenders[0];
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    return null;
-  };
-
-  // 生成所有可能的移动
-  const generateAllMoves = (board, color) => {
-    const moves = [];
-    
-    for (let fromRow = 0; fromRow < 10; fromRow++) {
-      for (let fromCol = 0; fromCol < 9; fromCol++) {
-        const piece = board[fromRow][fromCol];
-        if (piece && piece.color === color) {
-          for (let toRow = 0; toRow < 10; toRow++) {
-            for (let toCol = 0; toCol < 9; toCol++) {
-              if (isValidMove(fromRow, fromCol, toRow, toCol, board)) {
-                // 检查移动后是否会导致将帅相对
-                const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
-                
-                if (!isKingFaceToFace(newBoard)) {
-                  moves.push({
-                    fromRow,
-                    fromCol,
-                    toRow,
-                    toCol
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    return moves;
-  };
-
-  // 模拟移动
-  const simulateMove = (board, fromRow, fromCol, toRow, toCol) => {
-    const newBoard = [...board.map(r => [...r])];
-    newBoard[toRow][toCol] = board[fromRow][fromCol];
-    newBoard[fromRow][fromCol] = null;
-    return newBoard;
-  };
-
-  // 检查移动是否安全（移动后该棋子不会被立即吃掉）
-  const isSafeMove = (board, fromRow, fromCol, toRow, toCol) => {
-    const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
-    return !isPieceUnderThreat(newBoard, toRow, toCol);
-  };
-
-  // 寻找可以安全移动的位置
-  const findSafeMovesForPiece = (board, row, col) => {
-    const moves = [];
-    const piece = board[row][col];
-    
-    if (!piece) return moves;
-    
-    for (let toRow = 0; toRow < 10; toRow++) {
-      for (let toCol = 0; toCol < 9; toCol++) {
-        if (isValidMove(row, col, toRow, toCol, board)) {
-          const newBoard = simulateMove(board, row, col, toRow, toCol);
-          if (!isPieceUnderThreat(newBoard, toRow, toCol) && !isKingFaceToFace(newBoard)) {
-            moves.push({
-              fromRow: row,
-              fromCol: col,
-              toRow,
-              toCol
-            });
-          }
-        }
-      }
-    }
-    
-    return moves;
-  };
-
-  // 寻找威胁指定棋子的对方棋子
-  const findAttacker = (board, row, col) => {
-    const piece = board[row][col];
-    if (!piece) return null;
-    
-    const opponentColor = piece.color === 'red' ? 'black' : 'red';
-    
-    for (let fromRow = 0; fromRow < 10; fromRow++) {
-      for (let fromCol = 0; fromCol < 9; fromCol++) {
-        const attackerPiece = board[fromRow][fromCol];
-        if (attackerPiece && attackerPiece.color === opponentColor) {
-          if (isValidMove(fromRow, fromCol, row, col, board)) {
-            return { row: fromRow, col: fromCol };
-          }
-        }
-      }
-    }
-    
-    return null;
-  };
-
-  // 寻找可以吃掉指定位置棋子的己方棋子
-  const findDefenders = (board, row, col, defenderColor) => {
-    const moves = [];
-    
-    for (let fromRow = 0; fromRow < 10; fromRow++) {
-      for (let fromCol = 0; fromCol < 9; fromCol++) {
-        const defenderPiece = board[fromRow][fromCol];
-        if (defenderPiece && defenderPiece.color === defenderColor) {
-          if (isValidMove(fromRow, fromCol, row, col, board)) {
-            const newBoard = simulateMove(board, fromRow, fromCol, row, col);
-            if (!isKingFaceToFace(newBoard)) {
-              moves.push({
-                fromRow,
-                fromCol,
-                toRow: row,
-                toCol: col
-              });
-            }
-          }
-        }
-      }
-    }
-    
-    return moves;
-  };
-
-  // 评估移动的分数
-  const evaluateMove = (oldBoard, newBoard, fromRow, fromCol, toRow, toCol) => {
-    let score = 0;
-    
-    // 1. 基本分数：吃子的价值
-    const capturedPiece = oldBoard[toRow][toCol];
-    if (capturedPiece) {
-      score += PIECE_VALUES[capturedPiece.type];
-    }
-    
-    // 2. 移动后的位置价值
-    const piece = oldBoard[fromRow][fromCol];
-    
-    // 兵/卒过河加分
-    if (piece.type === '卒' && toRow < 5) {
-      score += 5;
-      // 越靠近对方将/帅加分越多
-      score += (5 - toRow) * 2;
-    }
-    
-    // 车控制中路加分
-    if (piece.type === '车') {
-      if (toCol >= 3 && toCol <= 5) {
-        score += 5;
-      }
-      // 控制更多格子加分
-      const controlledSquares = countControlledSquares(newBoard, toRow, toCol);
-      score += controlledSquares;
-    }
-    
-    // 马在中心位置加分
-    if (piece.type === '马') {
-      if (toRow >= 3 && toRow <= 6 && toCol >= 2 && toCol <= 6) {
-        score += 3;
-      }
-    }
-    
-    // 炮在有利位置加分
-    if (piece.type === '炮') {
-      // 检查是否有攻击目标
-      const attackTargets = countAttackTargets(newBoard, toRow, toCol, 'black');
-      score += attackTargets * 3;
-    }
-    
-    // 3. 战术考虑
-    
-    // 移动后是否将军
-    if (isCheck(newBoard, 'red')) {
-      score += 15;
-    }
-    
-    // 移动后是否解除了己方被将军
-    if (isCheck(oldBoard, 'black') && !isCheck(newBoard, 'black')) {
-      score += 20;
-    }
-    
-    // 移动后是否保护了重要棋子
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 9; col++) {
-        const p = newBoard[row][col];
-        if (p && p.color === 'black' && PIECE_VALUES[p.type] >= 40) {
-          if (isPieceUnderThreat(oldBoard, row, col) && !isPieceUnderThreat(newBoard, row, col)) {
-            score += PIECE_VALUES[p.type] / 10;
-          }
-        }
-      }
-    }
-    
-    // 4. 安全性考虑
-    
-    // 移动后棋子是否安全
-    if (isPieceUnderThreat(newBoard, toRow, toCol)) {
-      score -= PIECE_VALUES[piece.type] / 2;
-    }
-    
-    return score;
-  };
-
-  // 计算棋子控制的格子数量
-  const countControlledSquares = (board, row, col) => {
+  // 计算棋子的有效移动数量
+  const countValidMoves = (board, row, col) => {
     let count = 0;
     const piece = board[row][col];
     
@@ -1002,16 +706,19 @@ const ChineseChess = () => {
     return count;
   };
 
-  // 计算炮的攻击目标数量
-  const countAttackTargets = (board, row, col, color) => {
+  // 计算保护指定棋子的己方棋子数量
+  const countProtectingPieces = (board, kingRow, kingCol, color) => {
     let count = 0;
-    const opponentColor = color === 'red' ? 'black' : 'red';
     
-    for (let toRow = 0; toRow < 10; toRow++) {
-      for (let toCol = 0; toCol < 9; toCol++) {
-        const targetPiece = board[toRow][toCol];
-        if (targetPiece && targetPiece.color === opponentColor) {
-          if (isValidMove(row, col, toRow, toCol, board)) {
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col];
+        if (piece && piece.color === color && (row !== kingRow || col !== kingCol)) {
+          // 检查是否在将/帅周围
+          const rowDiff = Math.abs(row - kingRow);
+          const colDiff = Math.abs(col - kingCol);
+          
+          if (rowDiff <= 1 && colDiff <= 1) {
             count++;
           }
         }
@@ -1019,6 +726,68 @@ const ChineseChess = () => {
     }
     
     return count;
+  };
+
+  // 计算一方的总机动性
+  const countTotalMobility = (board, color) => {
+    let mobility = 0;
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col];
+        if (piece && piece.color === color) {
+          mobility += countValidMoves(board, row, col);
+        }
+      }
+    }
+    
+    return mobility;
+  };
+
+  // 评估一方对棋盘的控制力
+  const evaluateControlScore = (board, color) => {
+    let controlScore = 0;
+    
+    // 中心区域的权重
+    const centerWeights = [
+      [0, 0, 0, 1, 1, 1, 0, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 1, 2, 3, 2, 1, 0, 0],
+      [0, 0, 1, 2, 3, 2, 1, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 0, 1, 2, 1, 0, 0, 0],
+      [0, 0, 0, 1, 1, 1, 0, 0, 0]
+    ];
+    
+    // 计算对每个格子的控制
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (isSquareControlledBy(board, row, col, color)) {
+          controlScore += centerWeights[row][col];
+        }
+      }
+    }
+    
+    return controlScore;
+  };
+
+  // 检查一个格子是否被某方控制
+  const isSquareControlledBy = (board, row, col, color) => {
+    for (let fromRow = 0; fromRow < 10; fromRow++) {
+      for (let fromCol = 0; fromCol < 9; fromCol++) {
+        const piece = board[fromRow][fromCol];
+        if (piece && piece.color === color) {
+          if (isValidMove(fromRow, fromCol, row, col, board)) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
   };
 
   // 使用useEffect监听玩家回合变化，触发AI移动
@@ -1223,8 +992,156 @@ const ChineseChess = () => {
     return false; // 没有将军
   };
 
+  // 添加计算炮的攻击目标数量的函数
+  const countAttackTargets = (board, row, col, color) => {
+    let count = 0;
+    const opponentColor = color === 'red' ? 'black' : 'red';
+    
+    // 检查行方向
+    for (let c = 0; c < 9; c++) {
+      if (c === col) continue;
+      
+      let hasPlatform = false;
+      let minCol = Math.min(col, c);
+      let maxCol = Math.max(col, c);
+      
+      for (let i = minCol + 1; i < maxCol; i++) {
+        if (board[row][i]) {
+          if (!hasPlatform) {
+            hasPlatform = true;
+          } else {
+            // 超过一个棋子，不能攻击
+            hasPlatform = false;
+            break;
+          }
+        }
+      }
+      
+      if (hasPlatform && board[row][c] && board[row][c].color === opponentColor) {
+        count++;
+      }
+    }
+    
+    // 检查列方向
+    for (let r = 0; r < 10; r++) {
+      if (r === row) continue;
+      
+      let hasPlatform = false;
+      let minRow = Math.min(row, r);
+      let maxRow = Math.max(row, r);
+      
+      for (let i = minRow + 1; i < maxRow; i++) {
+        if (board[i][col]) {
+          if (!hasPlatform) {
+            hasPlatform = true;
+          } else {
+            // 超过一个棋子，不能攻击
+            hasPlatform = false;
+            break;
+          }
+        }
+      }
+      
+      if (hasPlatform && board[r][col] && board[r][col].color === opponentColor) {
+        count++;
+      }
+    }
+    
+    return count;
+  };
+
+  // 添加寻找进攻性移动的函数
+  const findAttackMove = (board) => {
+    // 生成所有可能的移动
+    const allMoves = generateAllMoves(board, 'black');
+    
+    // 首先检查是否可以将军
+    for (const move of allMoves) {
+      const { fromRow, fromCol, toRow, toCol } = move;
+      const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+      
+      // 检查移动后是否将军
+      if (isCheck(newBoard, 'red')) {
+        return move;
+      }
+    }
+    
+    // 然后检查是否可以吃子，按价值排序
+    const captureMoves = allMoves.filter(move => 
+      board[move.toRow][move.toCol] && board[move.toRow][move.toCol].color === 'red'
+    );
+    
+    if (captureMoves.length > 0) {
+      // 按被吃子的价值排序
+      captureMoves.sort((a, b) => {
+        const aValue = PIECE_VALUES[board[a.toRow][a.toCol].type];
+        const bValue = PIECE_VALUES[board[b.toRow][b.toCol].type];
+        return bValue - aValue;
+      });
+      
+      // 返回价值最高的吃子移动
+      return captureMoves[0];
+    }
+    
+    return null;
+  };
+
+  // 添加寻找防守性移动的函数
+  const findDefendMove = (board) => {
+    // 检查将/帅是否被将军
+    if (isCheck(board, 'black')) {
+      // 生成所有可能的移动
+      const allMoves = generateAllMoves(board, 'black');
+      
+      // 找出能解除将军的移动
+      for (const move of allMoves) {
+        const { fromRow, fromCol, toRow, toCol } = move;
+        const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+        
+        if (!isCheck(newBoard, 'black')) {
+          return move;
+        }
+      }
+    }
+    
+    // 检查是否有高价值棋子被威胁
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col];
+        if (piece && piece.color === 'black' && PIECE_VALUES[piece.type] >= 40) {
+          if (isPieceUnderThreat(board, row, col)) {
+            // 生成该棋子的所有可能移动
+            const moves = [];
+            for (let toRow = 0; toRow < 10; toRow++) {
+              for (let toCol = 0; toCol < 9; toCol++) {
+                if (isValidMove(row, col, toRow, toCol, board)) {
+                  const newBoard = simulateMove(board, row, col, toRow, toCol);
+                  if (!isKingFaceToFace(newBoard)) {
+                    moves.push({
+                      fromRow: row,
+                      fromCol: col,
+                      toRow,
+                      toCol
+                    });
+                  }
+                }
+              }
+            }
+            
+            // 如果有可能的移动，返回第一个
+            if (moves.length > 0) {
+              return moves[0];
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
+  };
+
   // 添加生成所有可能移动的函数
-  const generateMoves = (board, color) => {
+  const generateAllMoves = (board, color) => {
     const moves = [];
     
     for (let fromRow = 0; fromRow < 10; fromRow++) {
@@ -1235,31 +1152,14 @@ const ChineseChess = () => {
             for (let toCol = 0; toCol < 9; toCol++) {
               if (isValidMove(fromRow, fromCol, toRow, toCol, board)) {
                 // 检查移动后是否会导致将帅相对
-                const newBoard = [...board.map(r => [...r])];
-                newBoard[toRow][toCol] = board[fromRow][fromCol];
-                newBoard[fromRow][fromCol] = null;
+                const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
                 
                 if (!isKingFaceToFace(newBoard)) {
-                  // 计算移动的优先级（用于移动排序）
-                  let priority = 0;
-                  
-                  // 捕获对方棋子的移动优先级高
-                  if (board[toRow][toCol]) {
-                    priority += PIECE_VALUES[board[toRow][toCol].type];
-                  }
-                  
-                  // 被威胁的棋子移动优先级高
-                  if (isPieceUnderThreat(board, fromRow, fromCol)) {
-                    priority += PIECE_VALUES[board[fromRow][fromCol].type] / 2;
-                  }
-                  
                   moves.push({
                     fromRow,
                     fromCol,
                     toRow,
-                    toCol,
-                    priority,
-                    board: newBoard
+                    toCol
                   });
                 }
               }
@@ -1269,13 +1169,27 @@ const ChineseChess = () => {
       }
     }
     
-    // 按优先级排序移动
-    moves.sort((a, b) => b.priority - a.priority);
-    
     return moves;
   };
 
-  // 检查棋子是否受到威胁
+  // 添加模拟移动的函数
+  const simulateMove = (board, fromRow, fromCol, toRow, toCol) => {
+    const newBoard = [...board.map(r => [...r])];
+    newBoard[toRow][toCol] = board[fromRow][fromCol];
+    newBoard[fromRow][fromCol] = null;
+    return newBoard;
+  };
+
+  // 添加随机打乱数组的函数
+  const shuffleArray = (array) => {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  };
+
+  // 添加检查棋子是否受到威胁的函数
   const isPieceUnderThreat = (board, row, col) => {
     const piece = board[row][col];
     if (!piece) return false;
@@ -1305,7 +1219,7 @@ const ChineseChess = () => {
     // 使用setTimeout来避免UI阻塞
     setTimeout(() => {
       try {
-        // 智能选择移动
+        // 使用智能策略选择移动
         const bestMove = findSmartMove(board);
         
         if (bestMove) {
@@ -1345,7 +1259,192 @@ const ChineseChess = () => {
       }
       
       setAiThinking(false);
-    }, 300);
+    }, 500); // 增加延迟时间，给AI更多思考时间
+  };
+
+  // 修改findSmartMove函数，增加搜索深度
+  const findSmartMove = (board) => {
+    // 1. 检查是否可以将军或吃子
+    const attackMove = findAttackMove(board);
+    if (attackMove) return attackMove;
+    
+    // 2. 检查是否需要防守
+    const defendMove = findDefendMove(board);
+    if (defendMove) return defendMove;
+    
+    // 3. 使用增强版minimax算法，增加搜索深度
+    return findBestMoveWithMinimax(board, 3); // 增加搜索深度到3
+  };
+
+  // 修改findBestMoveWithMinimax函数，增加搜索深度
+  const findBestMoveWithMinimax = (board, depth) => {
+    const moves = generateAllMoves(board, 'black');
+    
+    if (moves.length === 0) return null;
+    
+    // 随机打乱移动顺序，增加变化性
+    shuffleArray(moves);
+    
+    let bestMove = null;
+    let bestScore = -Infinity;
+    
+    // 使用迭代加深搜索
+    for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
+      let currentBestMove = null;
+      let currentBestScore = -Infinity;
+      
+      for (const move of moves) {
+        const { fromRow, fromCol, toRow, toCol } = move;
+        const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+        
+        const score = minimax(newBoard, currentDepth - 1, -Infinity, Infinity, false);
+        
+        if (score > currentBestScore) {
+          currentBestScore = score;
+          currentBestMove = move;
+        }
+      }
+      
+      // 更新最佳移动
+      if (currentBestMove) {
+        bestMove = currentBestMove;
+        bestScore = currentBestScore;
+      }
+      
+      // 如果找到了必胜移动，提前结束搜索
+      if (bestScore > 5000) break;
+    }
+    
+    return bestMove;
+  };
+
+  // 修改minimax算法，增加评估的复杂性
+  const minimax = (board, depth, alpha, beta, isMaximizing) => {
+    // 达到搜索深度或游戏结束
+    if (depth === 0) {
+      return evaluateBoard(board);
+    }
+    
+    // 检查是否有一方被将死
+    if (isMaximizing) {
+      if (isCheckmate(board, 'black')) {
+        return -10000; // 黑方被将死
+      }
+    } else {
+      if (isCheckmate(board, 'red')) {
+        return 10000; // 红方被将死
+      }
+    }
+    
+    if (isMaximizing) {
+      let maxEval = -Infinity;
+      const moves = generateAllMoves(board, 'black');
+      
+      // 按照启发式规则排序移动
+      sortMovesByHeuristic(moves, board, true);
+      
+      // 限制考虑的移动数量，提高性能
+      const limitedMoves = depth >= 3 ? moves.slice(0, 10) : moves;
+      
+      for (const move of limitedMoves) {
+        const { fromRow, fromCol, toRow, toCol } = move;
+        const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+        
+        const evalScore = minimax(newBoard, depth - 1, alpha, beta, false);
+        maxEval = Math.max(maxEval, evalScore);
+        alpha = Math.max(alpha, evalScore);
+        if (beta <= alpha) break; // Alpha-Beta剪枝
+      }
+      
+      return maxEval;
+    } else {
+      let minEval = Infinity;
+      const moves = generateAllMoves(board, 'red');
+      
+      // 按照启发式规则排序移动
+      sortMovesByHeuristic(moves, board, false);
+      
+      // 限制考虑的移动数量，提高性能
+      const limitedMoves = depth >= 3 ? moves.slice(0, 10) : moves;
+      
+      for (const move of limitedMoves) {
+        const { fromRow, fromCol, toRow, toCol } = move;
+        const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+        
+        const evalScore = minimax(newBoard, depth - 1, alpha, beta, true);
+        minEval = Math.min(minEval, evalScore);
+        beta = Math.min(beta, evalScore);
+        if (beta <= alpha) break; // Alpha-Beta剪枝
+      }
+      
+      return minEval;
+    }
+  };
+
+  // 检查是否被将死
+  const isCheckmate = (board, color) => {
+    // 如果不是被将军，就不可能被将死
+    if (!isCheck(board, color)) {
+      return false;
+    }
+    
+    // 生成所有可能的移动
+    const moves = generateAllMoves(board, color);
+    
+    // 检查是否有任何移动可以解除将军
+    for (const move of moves) {
+      const { fromRow, fromCol, toRow, toCol } = move;
+      const newBoard = simulateMove(board, fromRow, fromCol, toRow, toCol);
+      
+      if (!isCheck(newBoard, color)) {
+        return false; // 找到了可以解除将军的移动
+      }
+    }
+    
+    return true; // 没有移动可以解除将军，被将死
+  };
+
+  // 按照启发式规则排序移动
+  const sortMovesByHeuristic = (moves, board, isMaximizing) => {
+    const color = isMaximizing ? 'black' : 'red';
+    
+    moves.sort((a, b) => {
+      let aScore = 0;
+      let bScore = 0;
+      
+      // 吃子的价值
+      const aTarget = board[a.toRow][a.toCol];
+      const bTarget = board[b.toRow][b.toCol];
+      
+      if (aTarget) {
+        aScore += PIECE_VALUES[aTarget.type];
+      }
+      
+      if (bTarget) {
+        bScore += PIECE_VALUES[bTarget.type];
+      }
+      
+      // 移动后是否将军
+      const aNewBoard = simulateMove(board, a.fromRow, a.fromCol, a.toRow, a.toCol);
+      const bNewBoard = simulateMove(board, b.fromRow, b.fromCol, b.toRow, b.toCol);
+      
+      if (isCheck(aNewBoard, color === 'red' ? 'black' : 'red')) {
+        aScore += 30;
+      }
+      
+      if (isCheck(bNewBoard, color === 'red' ? 'black' : 'red')) {
+        bScore += 30;
+      }
+      
+      // 移动的棋子价值（优先移动低价值棋子）
+      const aPiece = board[a.fromRow][a.fromCol];
+      const bPiece = board[b.fromRow][b.fromCol];
+      
+      aScore -= PIECE_VALUES[aPiece.type] / 100;
+      bScore -= PIECE_VALUES[bPiece.type] / 100;
+      
+      return isMaximizing ? bScore - aScore : aScore - bScore;
+    });
   };
 
   return (
