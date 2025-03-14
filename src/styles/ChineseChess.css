@@ -30,7 +30,10 @@ body, html {
   width: 100%;
   max-width: 680px;
   margin: 0 auto;
-  padding: 20px; /* 增加内边距，为边缘棋子留出空间 */
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* 修改棋盘样式，确保网格线正确显示 */
@@ -455,5 +458,31 @@ body, html {
   .restart-button, .undo-button, .ai-button {
     width: 100%;
     max-width: 280px;
+  }
+}
+
+/* 修改响应式设计的缩放比例，进一步增大手机端尺寸 */
+@media screen and (max-width: 768px) {
+  .chess-board {
+    transform: scale(0.95);
+    transform-origin: center;
+    margin: 0 auto;
+  }
+  
+  .chess-board-container {
+    padding: 5px;
+    overflow: visible;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .chess-board {
+    transform: scale(0.9);
+    transform-origin: center;
+    margin: 0 auto;
+  }
+  
+  .chess-board-container {
+    padding: 2px;
   }
 } 

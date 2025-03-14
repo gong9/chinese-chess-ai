@@ -1461,6 +1461,33 @@ const ChineseChess = () => {
     });
   };
 
+  // 在组件内修改响应式逻辑的缩放比例，进一步增大手机端尺寸
+  useEffect(() => {
+    const handleResize = () => {
+      // 根据窗口宽度调整棋盘大小
+      const chessBoard = document.querySelector('.chess-board');
+      if (chessBoard) {
+        if (window.innerWidth <= 480) {
+          chessBoard.style.transform = 'scale(0.9)';
+        } else if (window.innerWidth <= 768) {
+          chessBoard.style.transform = 'scale(0.95)';
+        } else {
+          chessBoard.style.transform = 'scale(1)';
+        }
+        chessBoard.style.transformOrigin = 'center';
+        chessBoard.style.margin = '0 auto';
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    // 初始加载时也调用一次
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
     <div className="game-container">
       <div className="game-title">中国象棋</div>
