@@ -139,18 +139,23 @@ const ChineseChess = () => {
     return initialBoard;
   }
 
-  // 添加一个函数来处理棋盘点击
+  // 修改handleBoardClick函数，添加触摸事件支持
   const handleBoardClick = (event) => {
     if (gameOver) return;
     
     // 获取点击位置相对于棋盘的坐标
     const boardRect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - boardRect.left;
-    const y = event.clientY - boardRect.top;
+    
+    // 支持触摸事件和鼠标事件
+    const clientX = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+    const clientY = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+    
+    const x = clientX - boardRect.left;
+    const y = clientY - boardRect.top;
     
     // 计算最接近的交叉点
-    const cellWidth = 680 / 8;
-    const cellHeight = 760 / 9;
+    const cellWidth = boardRect.width / 8;
+    const cellHeight = boardRect.height / 9;
     
     const col = Math.round(x / cellWidth);
     const row = Math.round(y / cellHeight);
@@ -159,6 +164,12 @@ const ChineseChess = () => {
     if (row >= 0 && row < 10 && col >= 0 && col < 9) {
       handlePieceMove(row, col);
     }
+  };
+
+  // 修改棋子点击事件，添加触摸事件支持
+  const handlePieceClick = (e, row, col) => {
+    e.stopPropagation();
+    handlePieceMove(row, col);
   };
 
   // 添加将帅相遇的规则检查
@@ -479,68 +490,71 @@ const ChineseChess = () => {
 
   const renderBoard = () => {
     return (
-      <div className="chess-board" onClick={handleBoardClick}>
-        <div className="board-grid">
-          {/* 渲染横线 */}
-          {[...Array(10)].map((_, i) => (
-            <div
-              key={`h-${i}`}
-              className={`horizontal-line middle ${i === 4 || i === 5 ? 'river' : ''}`}
-              style={{ top: `${i * (760/9)}px` }}
-            />
-          ))}
-          <div className="horizontal-line upper" />
-          <div className="horizontal-line lower" />
-          
-          {/* 渲染竖线 */}
-          {[...Array(9)].map((_, i) => (
-            <div
-              key={`v-${i}`}
-              className="vertical-line"
-              style={{ left: `${i * (680/8)}px` }}
-            />
-          ))}
+      <div className="chess-board-container">
+        <div 
+          className="chess-board" 
+          onClick={handleBoardClick}
+          onTouchStart={handleBoardClick}
+        >
+          <div className="board-grid">
+            {/* 渲染横线 */}
+            {[...Array(10)].map((_, i) => (
+              <div
+                key={`h-${i}`}
+                className={`horizontal-line middle ${i === 4 || i === 5 ? 'river' : ''}`}
+              />
+            ))}
+            <div className="horizontal-line upper" />
+            <div className="horizontal-line lower" />
+            
+            {/* 渲染竖线 - 直接设置样式 */}
+            {[...Array(9)].map((_, i) => (
+              <div
+                key={`v-${i}`}
+                className="vertical-line"
+                style={{ left: `${i * 12.5}%` }}
+              />
+            ))}
 
-          {/* 九宫格 */}
-          <div className="palace-cross top"></div>
-          <div className="palace-cross bottom"></div>
+            {/* 九宫格 */}
+            <div className="palace-cross top"></div>
+            <div className="palace-cross bottom"></div>
 
-          {/* 河界区域 - 放在竖线之后，确保覆盖竖线 */}
-          <div className="river-area" />
-          <div className="river-text">
-            <span>楚</span>
-            <span>河</span>
-            <span>汉</span>
-            <span>界</span>
-          </div>
-          
-          {/* 渲染棋子 */}
-          {board.map((row, rowIndex) => 
-            row.map((piece, colIndex) => 
-              piece && (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`piece ${piece.color} ${
-                    selectedPiece?.row === rowIndex && selectedPiece?.col === colIndex
-                      ? 'selected'
-                      : lastMove?.row === rowIndex && lastMove?.col === colIndex
-                      ? 'last-move'
-                      : ''
-                  }`}
-                  style={{
-                    left: `${colIndex * (680/8)}px`,
-                    top: `${rowIndex * (760/9)}px`,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePieceMove(rowIndex, colIndex);
-                  }}
-                >
-                  {piece.type}
-                </div>
+            {/* 河界区域 - 放在竖线之后，确保覆盖竖线 */}
+            <div className="river-area" />
+            <div className="river-text">
+              <span>楚</span>
+              <span>河</span>
+              <span>汉</span>
+              <span>界</span>
+            </div>
+            
+            {/* 渲染棋子 */}
+            {board.map((row, rowIndex) => 
+              row.map((piece, colIndex) => 
+                piece && (
+                  <div
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`piece ${piece.color} ${
+                      selectedPiece?.row === rowIndex && selectedPiece?.col === colIndex
+                        ? 'selected'
+                        : lastMove?.row === rowIndex && lastMove?.col === colIndex
+                        ? 'last-move'
+                        : ''
+                    }`}
+                    style={{
+                      left: `${colIndex * 100 / 8}%`,
+                      top: `${rowIndex * 100 / 9}%`,
+                    }}
+                    onClick={(e) => handlePieceClick(e, rowIndex, colIndex)}
+                    onTouchStart={(e) => handlePieceClick(e, rowIndex, colIndex)}
+                  >
+                    {piece.type}
+                  </div>
+                )
               )
-            )
-          )}
+            )}
+          </div>
         </div>
       </div>
     );

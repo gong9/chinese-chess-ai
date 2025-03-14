@@ -3,9 +3,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 10px;
+  box-sizing: border-box;
   min-height: 100vh;
-  padding: 20px;
   background: #f5f5f5;
   background-image: url('https://img.freepik.com/free-photo/chinese-calligraphy-paper-texture_53876-93585.jpg');
   background-size: cover;
@@ -22,158 +25,169 @@ body, html {
   overflow-x: hidden;
 }
 
-/* 修改棋盘样式，更加简洁 */
-.chess-board {
-  position: relative;
-  width: 720px;
-  height: 800px;
-  background: #e8c38d;
-  padding: 20px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+/* 修改棋盘容器，增加内边距 */
+.chess-board-container {
+  width: 100%;
+  max-width: 680px;
   margin: 0 auto;
-  border-radius: 4px;
-  border: 8px solid #8B4513;
+  padding: 20px; /* 增加内边距，为边缘棋子留出空间 */
 }
 
-.board-grid {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  width: 680px;
-  height: 760px;
+/* 修改棋盘样式，确保网格线正确显示 */
+.chess-board {
+  position: relative;
+  width: 100%;
+  padding-bottom: 111.76%; /* 保持9:8的宽高比 */
+  background-color: #f2d9a0;
+  border: 2px solid #8b4513;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  overflow: visible; /* 允许棋子溢出 */
+  margin: 5% 0; /* 上下增加空间 */
 }
 
 /* 横线 */
 .horizontal-line {
   position: absolute;
-  height: 2px;
-  background: #000;
+  width: 100%;
+  height: 1px;
+  background-color: #000;
+  z-index: 1; /* 确保网格线在棋子下方 */
 }
 
 .horizontal-line.upper {
-  width: 680px;
   top: 0;
+  left: 0;
+  height: 1px;
 }
 
 .horizontal-line.lower {
-  width: 680px;
   bottom: 0;
+  left: 0;
+  height: 1px;
 }
 
-.horizontal-line.middle {
-  width: 680px;
-}
+/* 修复网格线选择器，确保所有线都能正确显示 */
+.horizontal-line.middle:nth-of-type(1) { top: 0%; }
+.horizontal-line.middle:nth-of-type(2) { top: 11.11%; }
+.horizontal-line.middle:nth-of-type(3) { top: 22.22%; }
+.horizontal-line.middle:nth-of-type(4) { top: 33.33%; }
+.horizontal-line.middle:nth-of-type(5) { top: 44.44%; }
+.horizontal-line.middle:nth-of-type(6) { top: 55.55%; }
+.horizontal-line.middle:nth-of-type(7) { top: 66.66%; }
+.horizontal-line.middle:nth-of-type(8) { top: 77.77%; }
+.horizontal-line.middle:nth-of-type(9) { top: 88.88%; }
+.horizontal-line.middle:nth-of-type(10) { top: 100%; }
 
-/* 不显示河界区域的横线 */
+/* 恢复河界区域的横线 */
 .horizontal-line.river {
-  display: none;
+  display: block; /* 显示河界横线 */
 }
 
-/* 竖线 */
+/* 修复网格线选择器，确保所有线都能正确显示 */
+.board-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 竖线样式 - 简化 */
 .vertical-line {
   position: absolute;
-  width: 2px;
-  height: 760px;
-  background: #000;
+  width: 1px;
+  height: 100%;
+  background-color: #000;
+  z-index: 1;
 }
 
-/* 修改河界区域样式，确保不遮挡棋子 */
+/* 直接为每条线设置明确的位置，使用属性选择器 */
+.vertical-line[key="v-0"] { left: 0%; }
+.vertical-line[key="v-1"] { left: 12.5%; }
+.vertical-line[key="v-2"] { left: 25%; }
+.vertical-line[key="v-3"] { left: 37.5%; }
+.vertical-line[key="v-4"] { left: 50%; }
+.vertical-line[key="v-5"] { left: 62.5%; }
+.vertical-line[key="v-6"] { left: 75%; }
+.vertical-line[key="v-7"] { left: 87.5%; }
+.vertical-line[key="v-8"] { left: 100%; }
+
+/* 修改河界区域样式，确保不遮挡棋子但显示边界线 */
 .river-area {
   position: absolute;
-  top: 50%;
+  top: 44.44%;
   left: 0;
-  transform: translateY(-50%);
   width: 100%;
-  height: 84px;
-  background: #e8c38d; /* 使用不透明的背景色，与棋盘颜色相同 */
-  border-top: 2px solid #000;
-  border-bottom: 2px solid #000;
-  z-index: 1; /* 降低z-index，确保不遮挡棋子 */
+  height: 11.11%;
+  background-color: rgba(173, 216, 230, 0.2);
+  z-index: 0; /* 确保在网格线下方 */
 }
 
 /* 修改楚河汉界文字样式 */
 .river-text {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 48px;
-  font-weight: bold;
-  color: #8B4513;
+  top: 44.44%;
+  left: 0;
+  width: 100%;
+  height: 11.11%;
   display: flex;
-  justify-content: space-between;
-  width: 400px;
-  letter-spacing: 4px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 2; /* 确保文字在河界区域之上，但在棋子之下 */
-  pointer-events: none; /* 确保文字不会阻止点击 */
+  justify-content: center;
+  align-items: center;
+  font-size: 3vw;
+  color: #8b4513;
 }
 
 .river-text span {
-  margin: 0 10px;
+  margin: 0 2%;
 }
 
 /* 棋子样式 */
 .piece {
   position: absolute;
-  width: 64px;
-  height: 64px;
+  width: 9%; /* 减小棋子尺寸 */
+  height: 8%; /* 减小棋子尺寸 */
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #f8f4e6, #e6d2a8);
-  border: 2px solid #000;
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 32px;
+  align-items: center;
   font-weight: bold;
-  cursor: pointer;
+  font-size: 2.2vw; /* 减小字体大小 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   transform: translate(-50%, -50%);
-  z-index: 10; /* 确保棋子显示在最上层 */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-.piece:hover {
-  transform: translate(-50%, -50%) scale(1.05);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-}
-
-.piece.selected {
-  background: radial-gradient(circle at 30% 30%, #fff7d6, #ffd700);
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
-  border: 2px solid #ffd700;
-  z-index: 2;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-  }
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+  margin: 0;
 }
 
 .piece.red {
-  color: #d40000;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  background-color: #f44336;
+  color: #fff;
+  border: 2px solid #d32f2f;
 }
 
 .piece.black {
-  color: #000;
-  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+  background-color: #212121;
+  color: #fff;
+  border: 2px solid #000;
+}
+
+.piece.selected {
+  box-shadow: 0 0 0 3px #ffeb3b, 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.piece.last-move {
+  box-shadow: 0 0 0 3px #4caf50, 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* 添加游戏标题 */
 .game-title {
-  font-size: 48px;
+  font-size: 24px;
   font-weight: bold;
-  color: #8B4513;
   margin-bottom: 20px;
+  text-align: center;
+  color: #8B4513;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   background: rgba(255, 255, 255, 0.7);
   padding: 10px 30px;
@@ -183,7 +197,7 @@ body, html {
 
 /* 优化游戏控制区域 */
 .game-controls-container {
-  width: 720px;
+  width: 100%;
   margin-top: 20px;
   display: flex;
   flex-direction: column;
@@ -196,15 +210,14 @@ body, html {
 
 /* 游戏状态信息样式优化 */
 .game-over, .current-player {
-  text-align: center;
-  margin: 10px 0;
-  font-size: 28px;
+  margin-bottom: 15px;
+  font-size: 20px;
   font-weight: bold;
   color: #333;
 }
 
 .game-over {
-  color: #d40000;
+  color: #f44336;
   animation: fadeIn 0.5s ease-in;
 }
 
@@ -213,47 +226,54 @@ body, html {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 九宫格斜线 */
+/* 九宫格斜线 - 统一修复 */
 .palace-cross {
   position: absolute;
-  width: 170px;
-  height: 170px;
+  width: 25%;
+  height: 22.22%;
+  left: 37.5%;
   pointer-events: none;
-  z-index: 0;
 }
 
-/* 上方九宫格 */
+/* 上方九宫格（红方） */
 .palace-cross.top {
   top: 0;
-  left: 255px;
+  background-image: none;
+  overflow: hidden;
 }
 
-/* 下方九宫格 */
+/* 下方九宫格（黑方） */
 .palace-cross.bottom {
   bottom: 0;
-  left: 255px;
+  background-image: none;
+  overflow: hidden;
 }
 
-/* 斜线 */
+/* 统一的斜线样式 */
 .palace-cross::before,
 .palace-cross::after {
   content: '';
   position: absolute;
-  background: rgba(0, 0, 0, 0.5); /* 降低不透明度 */
-  width: 240px;
-  height: 1px; /* 减小线条宽度 */
+  width: 141.42%; /* 对角线长度 = 边长 * √2 */
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    #000,
+    #000 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  left: -20.71%; /* (100% - 141.42%) / 2 */
   top: 50%;
-  left: 50%;
   transform-origin: center;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2); /* 添加轻微阴影 */
 }
 
 .palace-cross::before {
-  transform: translate(-50%, -50%) rotate(45deg);
+  transform: rotate(45deg);
 }
 
 .palace-cross::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
+  transform: rotate(-45deg);
 }
 
 /* 添加可移动位置的提示样式 */
@@ -268,150 +288,172 @@ body, html {
 }
 
 /* 添加响应式设计 */
-@media (max-width: 768px) {
-  .chess-board {
-    width: 90vw;
-    height: calc(90vw * 10/9);
-    padding: 10px;
-  }
-  
-  .board-grid {
-    width: calc(90vw - 20px);
-    height: calc((90vw - 20px) * 10/9);
-    top: 10px;
-    left: 10px;
+@media (max-width: 600px) {
+  .game-title {
+    font-size: 20px;
+    margin-bottom: 15px;
   }
   
   .piece {
-    width: calc((90vw - 20px) / 9);
-    height: calc((90vw - 20px) / 9);
-    font-size: calc((90vw - 20px) / 18);
+    font-size: 4vw;
   }
   
   .river-text {
-    font-size: calc((90vw - 20px) / 15);
+    font-size: 4vw;
+  }
+  
+  .current-player {
+    font-size: 16px;
+  }
+  
+  .game-over {
+    font-size: 18px;
+  }
+  
+  button {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+}
+
+/* 超小屏幕适配 */
+@media (max-width: 400px) {
+  .game-title {
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+  
+  .piece {
+    font-size: 5vw;
+  }
+  
+  .river-text {
+    font-size: 5vw;
+  }
+  
+  .game-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  button {
+    width: 100%;
+    margin-bottom: 5px;
   }
 }
 
 /* 统一按钮样式 */
-.restart-button, .ai-button {
-  padding: 12px 24px;
-  font-size: 20px;
+.restart-button, .undo-button, .ai-button {
+  padding: 8px 16px;
+  font-size: 16px;
   font-weight: bold;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.3s, transform 0.2s;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   height: 50px;
   min-width: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 5px;
+}
+
+/* 按钮悬停效果 */
+.restart-button:hover, .undo-button:hover, .ai-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 按钮按下效果 */
+.restart-button:active, .undo-button:active, .ai-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* 重新开始按钮样式 */
 .restart-button {
-  background: #8B4513;
+  background-color: #2196f3;
 }
 
 .restart-button:hover {
-  background: #a0522d;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background-color: #0d8bf2;
+}
+
+/* 悔棋按钮样式 */
+.undo-button {
+  background-color: #ff9800;
+}
+
+.undo-button:hover {
+  background-color: #f57c00;
+}
+
+.undo-button:disabled {
+  background-color: #bdbdbd;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* AI按钮样式 */
 .ai-button {
-  background: #4b6584;
+  background-color: #4caf50;
 }
 
 .ai-button:hover {
-  background: #3c5270;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  background-color: #388e3c;
 }
 
 .ai-button.active {
-  background: #10ac84;
+  background-color: #f44336;
 }
 
 .ai-button.active:hover {
-  background: #0a8c6a;
+  background-color: #d32f2f;
 }
 
 /* 游戏控制按钮容器优化 */
 .game-controls {
   display: flex;
-  gap: 20px;
-  margin-top: 15px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 600px;
 }
 
 /* AI思考中的样式 */
 .ai-thinking {
-  color: #d40000;
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  color: #f44336;
+  font-style: italic;
 }
 
 /* 最后移动的棋子样式 */
 .piece.last-move {
-  background: radial-gradient(circle at 30% 30%, #fff7d6, #ffcc00);
-  box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
-  border: 2px solid #ffcc00;
-  z-index: 2;
-  animation: pulse-last-move 2s infinite;
+  box-shadow: 0 0 0 3px #4caf50, 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes pulse-last-move {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.08);
-    box-shadow: 0 0 20px rgba(255, 204, 0, 0.9);
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    box-shadow: 0 0 15px rgba(255, 204, 0, 0.8);
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .restart-button, .undo-button, .ai-button {
+    min-width: 120px;
+    font-size: 14px;
+    height: 40px;
   }
 }
 
-/* 悔棋按钮样式 */
-.undo-button {
-  padding: 12px 24px;
-  font-size: 20px;
-  font-weight: bold;
-  color: white;
-  background: #7d5a50;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  height: 50px;
-  min-width: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.undo-button:hover:not(:disabled) {
-  background: #9a7b70;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-}
-
-.undo-button:disabled {
-  background: #cccccc;
-  color: #999999;
-  cursor: not-allowed;
-  box-shadow: none;
+/* 超小屏幕适配 */
+@media (max-width: 400px) {
+  .game-controls {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .restart-button, .undo-button, .ai-button {
+    width: 100%;
+    max-width: 280px;
+  }
 } 
